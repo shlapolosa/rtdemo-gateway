@@ -74,15 +74,25 @@ class AgentConfig:
         )
 
 
-def get_agent_config() -> AgentConfig:
-    """Get agent configuration from environment variables"""
-    
-    # Required environment variables
-    agent_type_str = os.getenv("AGENT_TYPE")
+def get_agent_config(
+    default_agent_type: Optional[str] = None,
+    default_implementation_type: Optional[str] = None,
+) -> AgentConfig:
+    """Get agent configuration from environment variables.
+
+    AI-agent microservices call this with no arguments — AGENT_TYPE /
+    IMPLEMENTATION_TYPE remain required env vars for them. Infrastructure
+    consumers that are not AI agents (e.g. a generic realtime stream gateway)
+    pass defaults so they aren't forced to declare an agent identity they don't
+    use. Additive: existing callers are unaffected.
+    """
+
+    # Required environment variables (callers may supply a fallback default)
+    agent_type_str = os.getenv("AGENT_TYPE") or default_agent_type
     if not agent_type_str:
         raise ValueError("AGENT_TYPE environment variable is required")
-    
-    implementation_type_str = os.getenv("IMPLEMENTATION_TYPE")
+
+    implementation_type_str = os.getenv("IMPLEMENTATION_TYPE") or default_implementation_type
     if not implementation_type_str:
         raise ValueError("IMPLEMENTATION_TYPE environment variable is required")
     

@@ -86,9 +86,14 @@ def create_realtime_agent_app(
         logger.info(f"Starting real-time {service_name} service...")
         
         try:
-            # Load configuration
+            # Load configuration. A realtime stream gateway is not an AI agent,
+            # so it doesn't require AGENT_TYPE / IMPLEMENTATION_TYPE to be set —
+            # fall back to the generic orchestrator/deterministic identity.
             if not agent_config:
-                agent_config = get_agent_config()
+                agent_config = get_agent_config(
+                    default_agent_type="orchestrator",
+                    default_implementation_type="deterministic",
+                )
             
             # Load platform secrets if realtime platform is specified
             if agent_config.realtime_platform:

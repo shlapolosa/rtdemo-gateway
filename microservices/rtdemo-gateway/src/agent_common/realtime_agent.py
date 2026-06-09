@@ -8,7 +8,7 @@ import json
 from typing import Dict, List, Any, Optional, Set, Callable
 from datetime import datetime
 
-from .base_microservice_agent import BaseMicroserviceAgent, AgentTask, AgentResponse
+from .base_microservice_agent import BaseMicroserviceAgent, BaseProcessor, AgentTask, AgentResponse
 from .config import AgentConfig
 from .models import (
     RealtimeEvent, EventType, ConnectionStatus, RealtimeConnectionInfo,
@@ -451,3 +451,37 @@ class RealtimeAgent(BaseMicroserviceAgent):
             )
             await self._emit_event(failure_event)
             raise
+
+
+class _PassthroughProcessor(BaseProcessor):
+    """No-op processor for a generic stream gateway.
+
+    A stream gateway carries no domain logic — it relays events between
+    Kafka/MQTT and WebSocket clients — so the knowledge base and templates
+    are intentionally empty.
+    """
+
+    def _initialize_knowledge_base(self) -> Dict[str, Any]:
+        return {}
+
+    def _initialize_templates(self) -> Dict[str, str]:
+        return {}
+
+
+class GenericRealtimeAgent(RealtimeAgent):
+    """Concrete, instantiable realtime agent for a generic websocket+Kafka
+    stream gateway.
+
+    ``RealtimeAgent`` provides all the streaming machinery but leaves
+    ``_create_processor`` / ``_get_supported_task_types`` abstract (inherited
+    from ``BaseMicroserviceAgent``). A plain stream gateway has no agent-specific
+    task processing, so this concrete subclass supplies a no-op processor and the
+    generic streaming verbs. Scaffolded realtime-service entrypoints use this
+    instead of the abstract base.
+    """
+
+    def _create_processor(self) -> BaseProcessor:
+        return _PassthroughProcessor()
+
+    def _get_supported_task_types(self) -> List[str]:
+        return ["stream", "passthrough"]
