@@ -107,12 +107,22 @@ def create_realtime_agent_app(
                     default_implementation_type="deterministic",
                 )
             
-            # Load platform secrets if realtime platform is specified
+            # Load platform secrets if realtime platform is specified. This is
+            # best-effort: the <realtime>-conn binding secret is already mounted
+            # via envFrom (KAFKA_BOOTSTRAP_SERVERS, CONSUME_*/PRODUCE_*, etc.), so
+            # the in-code secret loader is a supplement, not a hard dependency —
+            # a failure here must not crash startup (RT-1 binding-first contract).
             if agent_config.realtime_platform:
-                logger.info(f"Loading secrets for realtime platform: {agent_config.realtime_platform}")
-                secrets = await load_realtime_platform_secrets(agent_config.realtime_platform)
-                agent_config = configure_agent_from_secrets(agent_config, secrets)
-                logger.info(f"Configuration updated with platform secrets")
+                try:
+                    logger.info(f"Loading secrets for realtime platform: {agent_config.realtime_platform}")
+                    secrets = await load_realtime_platform_secrets(agent_config.realtime_platform)
+                    agent_config = configure_agent_from_secrets(agent_config, secrets)
+                    logger.info(f"Configuration updated with platform secrets")
+                except Exception as e:
+                    logger.warning(
+                        f"Platform secret loader unavailable ({e}); continuing with "
+                        f"binding env (KAFKA_BOOTSTRAP_SERVERS/CONSUME_*/PRODUCE_*)"
+                    )
             
             # Initialize agent with configuration
             agent = agent_class(

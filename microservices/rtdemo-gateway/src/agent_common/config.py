@@ -74,6 +74,22 @@ class AgentConfig:
         )
 
 
+def _resolve_streaming_topics() -> List[str]:
+    """Topics the realtime consumer subscribes to.
+
+    Prefer an explicit STREAMING_TOPICS (comma-separated). Otherwise fall back
+    to the per-topic CONSUME_<topic> env vars injected by the realtime-service
+    CD (RT-1 binding convention), e.g. CONSUME_sensor_agg=sensor_agg. Without
+    this the consumer subscribed to nothing and no data ever reached /ws.
+    """
+    explicit = os.getenv("STREAMING_TOPICS", "")
+    if explicit:
+        return [t for t in explicit.split(",") if t]
+    return sorted(
+        v for k, v in os.environ.items() if k.startswith("CONSUME_") and v
+    )
+
+
 def get_agent_config(
     default_agent_type: Optional[str] = None,
     default_implementation_type: Optional[str] = None,
@@ -125,14 +141,18 @@ def get_agent_config(
         max_concurrent_tasks=int(os.getenv("MAX_CONCURRENT_TASKS", "10")),
         task_timeout=int(os.getenv("TASK_TIMEOUT", "300")),
         
-        # Real-time platform configurations
-        realtime_platform=os.getenv("REALTIME_PLATFORM"),
+        # Real-time platform configurations. The realtime-service CD injects
+        # REALTIME_PLATFORM_NAME (binding convention); honor it so the realtime
+        # connections (Kafka consumer/producer) actually initialize.
+        realtime_platform=os.getenv("REALTIME_PLATFORM") or os.getenv("REALTIME_PLATFORM_NAME"),
         websocket_enabled=os.getenv("WEBSOCKET_ENABLED", "false").lower() == "true",
-        
-        # Streaming configurations
+
+        # Streaming configurations. Topics come from STREAMING_TOPICS, or — when
+        # absent — from the per-topic CONSUME_<topic> binding env the CD injects
+        # (RT-1 BIND convention), so the gateway subscribes to what the OAM declared.
         kafka_bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS"),
         kafka_schema_registry_url=os.getenv("KAFKA_SCHEMA_REGISTRY_URL"),
-        streaming_topics=os.getenv("STREAMING_TOPICS", "").split(",") if os.getenv("STREAMING_TOPICS") else [],
+        streaming_topics=_resolve_streaming_topics(),
         streaming_consumer_group=os.getenv("STREAMING_CONSUMER_GROUP"),
         
         # MQTT configurations
