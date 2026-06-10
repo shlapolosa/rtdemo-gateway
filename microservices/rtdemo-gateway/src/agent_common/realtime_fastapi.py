@@ -71,6 +71,18 @@ def create_realtime_agent_app(
 
     _verify = verify_token or _default_verify_token
 
+    # RT-1 (#167): the WebSocket routes must be registered at app-BUILD time, but
+    # the runtime agent_config (with websocket_enabled) is only loaded later in
+    # lifespan — at build time `config` is usually None, so gating registration on
+    # it left /ws unregistered (404). Decide from build-time signals instead: the
+    # WEBSOCKET_ENABLED env (set by the realtime-service CD), an explicit
+    # websocket_endpoints list, or a pre-supplied config.
+    _websocket_enabled = (
+        os.getenv("WEBSOCKET_ENABLED", "false").lower() == "true"
+        or bool(websocket_endpoints)
+        or (config is not None and getattr(config, "websocket_enabled", False))
+    )
+
     def _extract_ws_token(ws: WebSocket) -> Optional[str]:
         auth = ws.headers.get("authorization") or ws.headers.get("Authorization")
         if auth and auth.lower().startswith("bearer "):
@@ -250,8 +262,8 @@ def create_realtime_agent_app(
     # WebSocket Endpoints
     # =====================================================================
     
-    if agent_config and agent_config.websocket_enabled:
-        
+    if _websocket_enabled:
+
         @app.websocket("/ws")
         async def websocket_endpoint(
             websocket: WebSocket,
@@ -302,10 +314,16 @@ def create_realtime_agent_app(
                 logger.error(f"Events WebSocket error: {e}")
                 await manager.disconnect(websocket, reason=f"Error: {str(e)}")
         
-        # Add custom WebSocket endpoints
+        # Add custom WebSocket endpoints. Skip the reserved paths already
+        # registered above (/ws, /ws/events) — those carry the in-service JWT
+        # gate, whereas this generic loop does not; re-registering /ws here would
+        # both double-register and bypass auth.
+        _reserved_ws_paths = {"/ws", "/ws/events"}
         if websocket_endpoints:
             for ws_config in websocket_endpoints:
                 path = ws_config["path"]
+                if path in _reserved_ws_paths:
+                    continue
                 handler_name = ws_config.get("handler", "default")
                 auto_subscribe = ws_config.get("auto_subscribe", [])
                 
