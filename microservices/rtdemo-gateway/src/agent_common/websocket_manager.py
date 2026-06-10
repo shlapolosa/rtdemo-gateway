@@ -9,7 +9,7 @@ from typing import Set, Dict, Any, Optional, List, Callable
 from datetime import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .models import WebSocketMessage, RealtimeEvent, ConnectionStatus
+from .models import ws_json_default, WebSocketMessage, RealtimeEvent, ConnectionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +328,7 @@ class WebSocketConnectionManager:
         """
         try:
             message_data = message.dict()
-            await websocket.send_text(json.dumps(message_data))
+            await websocket.send_text(json.dumps(message_data, default=ws_json_default))
             return True
         except WebSocketDisconnect:
             logger.info("WebSocket disconnected during send")
@@ -350,7 +350,7 @@ class WebSocketConnectionManager:
             return
         
         message_data = message.dict()
-        message_json = json.dumps(message_data)
+        message_json = json.dumps(message_data, default=ws_json_default)
         
         # Send to all connections concurrently
         send_tasks = []

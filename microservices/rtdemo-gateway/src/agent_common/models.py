@@ -6,8 +6,23 @@ import uuid
 from enum import Enum
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, Field
+
+
+def ws_json_default(o: Any) -> Any:
+    """json.dumps default= for WebSocket payloads.
+
+    Real-time event payloads carry Enum (e.g. EventType) and datetime values
+    (RealtimeEvent.timestamp) that the stdlib JSON encoder rejects, which made
+    every streamed broadcast fail ('Object of type datetime/EventType is not
+    JSON serializable') and silently dropped delivery to /ws clients (RT-1 #167).
+    """
+    if isinstance(o, Enum):
+        return o.value
+    if isinstance(o, (datetime, date)):
+        return o.isoformat()
+    return str(o)
 
 
 class AgentType(Enum):

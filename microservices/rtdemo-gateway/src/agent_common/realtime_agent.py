@@ -11,6 +11,7 @@ from datetime import datetime
 from .base_microservice_agent import BaseMicroserviceAgent, BaseProcessor, AgentTask, AgentResponse
 from .config import AgentConfig
 from .models import (
+    ws_json_default,
     RealtimeEvent, EventType, ConnectionStatus, RealtimeConnectionInfo,
     AgentRealtimeStatus, KafkaMessageModel, MQTTMessageModel, WebSocketMessage
 )
@@ -343,7 +344,7 @@ class RealtimeAgent(BaseMicroserviceAgent):
         
         for websocket in self.websocket_connections:
             try:
-                await websocket.send_text(json.dumps(message_data))
+                await websocket.send_text(json.dumps(message_data, default=ws_json_default))
             except Exception as e:
                 logger.warning(f"Failed to send WebSocket message: {e}")
                 disconnected.add(websocket)
