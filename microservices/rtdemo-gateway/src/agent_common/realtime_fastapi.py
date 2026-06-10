@@ -285,19 +285,29 @@ def create_realtime_agent_app(
                 await websocket.close(code=4401)  # 4401 ~ unauthorized
                 return
             await manager.connect(websocket)
-            
+            # RT-1 (#167): bridge this connection into the agent's broadcast set.
+            # The agent emits messages from consumed Kafka/MQTT events via
+            # _broadcast_websocket(self.websocket_connections); manager.connect()
+            # alone does NOT register the socket there, so streamed telemetry never
+            # reached /ws clients (consumer LAG=0 but nothing delivered).
+            if agent:
+                await agent.add_websocket_connection(websocket)
+
             try:
                 while True:
                     # Receive message from client
                     data = await websocket.receive_text()
                     await manager.handle_message(websocket, data)
-                    
+
             except WebSocketDisconnect:
                 await manager.disconnect(websocket)
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
                 await manager.disconnect(websocket, reason=f"Error: {str(e)}")
-        
+            finally:
+                if agent:
+                    await agent.remove_websocket_connection(websocket)
+
         @app.websocket("/ws/events")
         async def events_websocket(
             websocket: WebSocket,
@@ -309,20 +319,25 @@ def create_realtime_agent_app(
                 await websocket.close(code=4401)
                 return
             await manager.connect(websocket, metadata={"endpoint_type": "events"})
-            
+            if agent:
+                await agent.add_websocket_connection(websocket)
+
             try:
                 # Auto-subscribe to general events
                 await manager.subscribe_to_topic(websocket, "events")
-                
+
                 while True:
                     data = await websocket.receive_text()
                     await manager.handle_message(websocket, data)
-                    
+
             except WebSocketDisconnect:
                 await manager.disconnect(websocket)
             except Exception as e:
                 logger.error(f"Events WebSocket error: {e}")
                 await manager.disconnect(websocket, reason=f"Error: {str(e)}")
+            finally:
+                if agent:
+                    await agent.remove_websocket_connection(websocket)
         
         # Add custom WebSocket endpoints. Skip the reserved paths already
         # registered above (/ws, /ws/events) — those carry the in-service JWT
