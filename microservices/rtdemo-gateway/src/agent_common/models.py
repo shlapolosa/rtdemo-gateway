@@ -246,8 +246,12 @@ class RealtimeConnectionInfo(BaseModel):
 
 class AgentRealtimeStatus(BaseModel):
     """Real-time status for an agent"""
-    agent_type: AgentType
-    implementation_type: ImplementationType
+    # Descriptive status fields (not control fields): a generic realtime stream
+    # gateway reports a free-form service type (e.g. "rtdemo"), not necessarily an
+    # AI-agent AgentType. Keep these as plain strings so the status model describes
+    # rather than constrains — the strict enums rejected the gateway's /health.
+    agent_type: str
+    implementation_type: str
     service_name: str
     realtime_enabled: bool
     websocket_enabled: bool

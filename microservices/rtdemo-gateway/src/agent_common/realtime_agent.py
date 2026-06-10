@@ -394,9 +394,11 @@ class RealtimeAgent(BaseMicroserviceAgent):
     
     def get_realtime_status(self) -> AgentRealtimeStatus:
         """Get current real-time status"""
+        impl = getattr(self.config, 'implementation_type', None)
+        impl_str = impl.value if hasattr(impl, 'value') else (impl or 'unknown')
         return AgentRealtimeStatus(
-            agent_type=self.agent_type,
-            implementation_type=getattr(self.config, 'implementation_type', 'unknown'),
+            agent_type=str(self.agent_type),
+            implementation_type=impl_str,
             service_name=self.name,
             realtime_enabled=bool(self.config.realtime_platform),
             websocket_enabled=self.config.websocket_enabled,
