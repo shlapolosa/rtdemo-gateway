@@ -25,3 +25,4 @@ spec:
 
 - (Services will be listed here as they are added)
 - rtdemo-gateway (python/fastapi)
+- rtdemo-gateway (python/fastapi)
